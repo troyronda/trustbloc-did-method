@@ -86,25 +86,34 @@ graph LR
     TAPIA -->|Signed Tree Head| OBS
 ```
 
-In Sidetree, a particular unique suffix forms its own tree structure independent of the ledger. Each change (operation) to the original unique suffix references the previous which forms its own independent verifiable chain. For interconnected cases (as described above), we must also define rules for a unique suffix that has operations across multiple trees.
+In Sidetree, a particular unique suffix forms its own tree structure independent of the ledger. Each change (operation) to the original unique suffix references the previous which forms its own independent verifiable chain. For interconnected cases (as described above), we must also define rules for a unique suffix that has operations across multiple trees. These rules could, conceptually, either be based on existing Sidetree operations or by defining explicit operations.
 
-Applying patches observed from multiple trees:
+To apply patches when observing multiple trees (without defining a new Sidetree operation), we need a rule to determine the currently active tree. The longest observed suffix chain forms the authoritative operation sequence for that suffix. 
 
-* The longest observed suffix chain forms the authoritative operation sequence for that suffix. The suffix chain length is based on both the Sidetree recovery and update commitments. The longest chain of Sidetree recovery commitments wins. In case of a tie, the longest chain of update commitments wins.
-* In case of a tie with the same operations (no conflict), there is no issue.
-* In case of a tie between conflicting operations, a recovery operation takes first precedence, deactivate operation takes second precedence. In other cases, the latest non-conflicting operation is the last operation to be applied (until the tie is resolved).
+However, it would seem sensible to have a more explicit operation for moving a DID across trees. This more explicit operation could be envisioned as a signed export/move operation for the old tree and a signed import variation of create for the new tree. An observer with knowledge of both trees would then be able to verify that the export and import are linked. Having export and import variations may also lessen the burden on the DID controller to preserve the suffix chain. Having explicit operations also more explicitly resolves the rules for a chain that has a deactivate operation versus another chain that continues with recovery operations.
 
 Considerations:
 
 * The operator that is observing another operator MAY replicate the tree and CAS into their own registry. To enable replication across registries, the trees should be storage-agnostic, protocol-agnostic, and transport-agnostic formats (and be offline-compatible).
 * The usage of a verifiable tree structure between operators enable detection of attempts to change history or rollback. When these attempts occur, an operator can independently determine their appropriate response (e.g., alert, stop observing the other operator, and/or ignore the trees from that operator).
 * The usage of signed tree heads provides additional assurance beyond transport security that an operator intended to publish their tree. Additional metadata is also included (e.g., the operator’s timestamp).
-* When moving a DID to a new tree:
+* Although an observer with knowledge of both trees would be able to verify that export and import operations are linked, there can be cases where the old tree becomes decomissioned. In these cases, the observer should allow for implicit exports in the decomissioned tree.
+
+##### Moving between trees using existing Sidetree operations
+
+As a thought experiment, we could attempt to create rules to disambiguate suffix chain length without creating explicit operations. The suffix chain length is based on both the Sidetree recovery and update commitments as follows:
+
+* A suffix chain with a valid deactivate operation wins. The DID is deactivated.
+* The longest chain of Sidetree recovery commitments wins.
+* In case of a tie between two trees' suffix recovery chain length, the longest chain of update commitments wins.
+* In case of a tie between two trees' suffix chain length with the same operations (no conflict), there is no issue.
+* In the ambiguous case of a tie between two trees' suffix chain length with different final operations, the final ambiguous operation is ignored (and not applied). Note: to properly break the tie, the DID controller should apply an operation to one of the trees.
+
+When moving a DID to a new tree (without defining a new Sidetree operation):
 
   * The controller MUST publish the existing creation and recovery sequences onto the new tree.
-  * The controller MUST publish a new recovery operation onto the new tree (and not the old tree). It might be advisable to squash the latest Sidetree update operations into this new recovery operation on the new tree.
-  * The DID controller SHOULD deactivate the DID on the old tree (if possible).
-  * Future: it may be sensible to have a more explicit operation for moving a DID across trees.
+  * The controller MUST publish a new recovery operation onto the new tree (and not the old tree) with the latest document content.
+  * Note: we should also signal that operations will no longer be on the old tree. However, the existing Sidetree deactivate operation semantics do not completely match the Multitree semantics (despite some similarity). An explicit export operation (as mentioned earlier) would be beneficial for this case.
 
 ### Hub instances
 
